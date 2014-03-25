@@ -26,8 +26,9 @@ class zstack(object):
 
     def scan(self, threshValue=127, maxValue=255, adaptive=0):
         self.totalSize = []
+        self.nParticles = []
         j = 0
-        while 1:
+        while 1: 
             try:
                 self.im.seek(j)
                 print(j)
@@ -45,12 +46,14 @@ class zstack(object):
             gray = cv2.GaussianBlur(gray, (5,5), 0)
             gray = gray.clip(0,255)
             gray = gray.astype('B')
+            threshValue = np.mean(gray) + 0.2*(np.max(gray)-np.min(gray))
             
             if adaptive == 1:
                 print('code me')
             else:
                 method = cv2.THRESH_BINARY
                 ret, thresh = cv2.threshold(gray, threshValue, maxValue, method)
+
             labelarray, particle_count = ndimage.measurements.label(thresh)
             particleSize = np.zeros(particle_count)
             for i in range(0, particle_count):
@@ -58,6 +61,7 @@ class zstack(object):
             totalSize = np.sum(particleSize[1:particleSize.shape[0]])
 
             labelarray, particle_count = ndimage.measurements.label(thresh)
+            self.nParticles.append(particle_count)
             particleSize = np.zeros(particle_count)
 
             for i in range(0, particle_count):
@@ -65,7 +69,8 @@ class zstack(object):
             self.totalSize.append(np.sum(particleSize[1:particleSize.shape[0]]))
             j+=1
 
-        self.totalSize = np.asarray(self.totalSize)
+		#self.totalSize = np.asarray(self.totalSize)
+		#self.nParticles = np.asarray(self.nParticles)
 
             
     def scanTrial(self):
