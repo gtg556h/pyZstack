@@ -1,0 +1,4 @@
+* Resources:
+** Vaquero, Gelfand, Tico, Pulli, and Turk, "Generalized Autofocus"
+** http://stackoverflow.com/questions/7765810/is-there-a-way-to-detect-if-an-image-is-blurry
+
