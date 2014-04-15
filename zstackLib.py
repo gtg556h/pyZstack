@@ -148,7 +148,8 @@ def sharpnessFourier(image):
     winSize = np.round(w/2.1)
     c1 = np.round(fft.shape[0]/2)
     c2 = np.round(fft.shape[1]/2)
-    sharpness = np.mean(fft[c1-winSize:c1+winSize,c2-winSize:c2+winSize])
+    #sharpness = np.mean(fft[c1-winSize:c1+winSize,c2-winSize:c2+winSize])
+    sharpness = np.mean(fft)
     return sharpness
 
 
