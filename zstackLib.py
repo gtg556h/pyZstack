@@ -5,7 +5,6 @@
 #  brn.j.williams@gmail.com                  #
 ##############################################
 
-# Finish padImage function
 
 
 from __future__ import division
@@ -39,7 +38,7 @@ class zstack(object):
             i+=1
                 
     ###########################################################
-    def focusScan(self, threshValue=127, maxValue=255, adaptive=0):
+    def focusScan(self, threshValue=127, blurWindow=0, particleAnalysis=0, maxValue=255, adaptive=0, sharpnessMethod='fourier'):
         self.totalSize = []
         self.nParticles = []
         self.sharpness = []
@@ -59,41 +58,53 @@ class zstack(object):
             except IndexError:
                 gray = image
 
-            gray = cv2.GaussianBlur(gray, (5,5), 0)
-            gray = gray.clip(0,255)
-            gray = gray.astype('B')
-            threshValue = np.mean(gray) + 0.2*(np.max(gray)-np.min(gray))
+            if blurWindow > 0:
+                gray = cv2.GaussianBlur(gray, (blurWindow,blurWindow), 0)
             
-            if adaptive == 1:
-                print('code me')
-            else:
-                method = cv2.THRESH_BINARY
-                ret, thresh = cv2.threshold(gray, threshValue, maxValue, method)
+            if particleAnalysis == 1:
+                gray = gray.clip(0,255)
+                gray = gray.astype('B')
+                threshValue = np.mean(gray) + 0.2*(np.max(gray)-np.min(gray))
+            
+                if adaptive == 1:
+                    print('code me')
+                else:
+                    method = cv2.THRESH_BINARY
+                    ret, thresh = cv2.threshold(gray, threshValue, maxValue, method)
+                labelarray, particle_count = ndimage.measurements.label(thresh)
+                particleSize = np.zeros(particle_count)
+                for i in range(0, particle_count):
+                    particleSize[i] = np.size(np.where(labelarray==i)[0])
+                totalSize = np.sum(particleSize[1:particleSize.shape[0]])
 
-            labelarray, particle_count = ndimage.measurements.label(thresh)
-            particleSize = np.zeros(particle_count)
-            for i in range(0, particle_count):
-                particleSize[i] = np.size(np.where(labelarray==i)[0])
-            totalSize = np.sum(particleSize[1:particleSize.shape[0]])
-
-            labelarray, particle_count = ndimage.measurements.label(thresh)
-            self.nParticles.append(particle_count)
-            particleSize = np.zeros(particle_count)
-
-            for i in range(0, particle_count):
-                particleSize[i] = np.size(np.where(labelarray==i)[0])
-            self.totalSize.append(np.sum(particleSize[1:particleSize.shape[0]]))
+                labelarray, particle_count = ndimage.measurements.label(thresh)
+                self.nParticles.append(particle_count)
+                particleSize = np.zeros(particle_count)
+                
+                for i in range(0, particle_count):
+                    particleSize[i] = np.size(np.where(labelarray==i)[0])
+                self.totalSize.append(np.sum(particleSize[1:particleSize.shape[0]]))
             j+=1
 
-            sharpness, conv = zstackLib.sharpnessLaplace(gray)
-            self.sharpness.append(sharpness)
-            #self.sharpness.append(zstackLib.sharpnessLaplace(gray))
+            if sharpnessMethod == 'fourier':
+                sharpness = zstackLib.sharpnessFourier(gray)
+                self.sharpness.append(sharpness)
+            elif sharpnessMethod == 'laplace':
+                sharpness, conv = zstackLib.sharpnessLaplace(gray)
+                self.sharpness.append(sharpness)
+            else:
+                print('Unknown method!')
             
 
-        self.totalSize = np.asarray(self.totalSize)
-        self.nParticles = np.asarray(self.nParticles)
-        self.sharpness = np.asarray(self.sharpness)
-        self.conv = conv
+        if particleAnalysis == 1:
+            self.totalSize = np.asarray(self.totalSize)
+            self.nParticles = np.asarray(self.nParticles)
+            self.sharpness = np.asarray(self.sharpness)
+        if sharpnessMethod == 'laplace':
+            self.conv = conv
+
+        self.focusFrame = np.argmax(self.sharpness)
+        print('Frame in focus ', self.focusFrame)
 
 
     #######################################################        
@@ -112,13 +123,6 @@ class zstack(object):
     ######################################################
 
     ######################################################
-    def sharpnessFourier(self):
-        # High frequency content indicates sharpeness
-        print('write some code')
-
-
-
-    ######################################################
     def writeImage(self,filename,im):
         scipy.misc.imsave(filename,im)
 
@@ -132,6 +136,20 @@ class zstack(object):
             plt.show()
         except EOFError:
             print('Bad frame number')
+            
+
+##########################################
+
+def sharpnessFourier(image):
+    # High frequency content indicates sharpeness
+    fft = np.fft.fft2(image)
+    fft = np.abs(fft)
+    w = np.min([fft.shape[0], fft.shape[1]])
+    winSize = np.round(w/2.1)
+    c1 = np.round(fft.shape[0]/2)
+    c2 = np.round(fft.shape[1]/2)
+    sharpness = np.mean(fft[c1-winSize:c1+winSize,c2-winSize:c2+winSize])
+    return sharpness
 
 
 ##########################################
@@ -143,10 +161,11 @@ def sharpnessLaplace(image):
     #    1
 
     laplaceKernel = np.array([[0,1,0],[1,-4,1],[0,1,0]])
+    #laplaceKernel = np.array([[0,0,0],[0,1,0],[0,0,0]])
 
     # Pad image:
     image2 = zstackLib.padImage(image,2)
-    print(image2.dtype)
+    #print(image2.dtype)
 
     conv = np.abs(scipy.signal.convolve2d(image2,laplaceKernel))
     #return np.sum(conv),conv
